@@ -10,6 +10,8 @@
  */
 package org.eclipse.che.workspace.infrastructure.openshift.project;
 
+import static java.lang.String.format;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -33,17 +35,20 @@ import org.eclipse.che.workspace.infrastructure.openshift.OpenShiftClientFactory
 @Singleton
 public class OpenShiftProjectCleanerSelector {
 
-  private final boolean pvcStrategy;
+  private final boolean pvcEnabled;
   private final String projectName;
+  private final String pvcStrategy;
   private final String pvcName;
   private final OpenShiftClientFactory clientFactory;
 
   @Inject
   public OpenShiftProjectCleanerSelector(
-      @Named("che.infra.openshift.pvc.one_per_workspace") boolean pvcStrategy,
+      @Named("che.infra.openshift.pvc.enabled") boolean pvcEnabled,
       @Nullable @Named("che.infra.openshift.project") String projectName,
+      @Named("che.infra.openshift.pvc.strategy") String pvcStrategy,
       @Named("che.infra.openshift.pvc.name") String pvcName,
       OpenShiftClientFactory clientFactory) {
+    this.pvcEnabled = pvcEnabled;
     this.clientFactory = clientFactory;
     this.pvcStrategy = pvcStrategy;
     this.projectName = projectName;
@@ -52,18 +57,29 @@ public class OpenShiftProjectCleanerSelector {
 
   @Inject
   public void subscribe(EventService eventService) {
+    if (!pvcEnabled) {
+      return;
+    }
+    // removes OpenShift project when no project configured for all che workspaces
     if (projectName == null) {
       eventService.subscribe(new DeleteOpenShiftProjectOnWorkspaceRemove());
       return;
     }
-    if (pvcStrategy) {
-      eventService.subscribe(new DeleteOpenShiftProjectPvcOnWorkspaceRemove(projectName));
+    switch (pvcStrategy) {
+      case "onePerWorkspace":
+        eventService.subscribe(new DeleteOpenShiftProjectPvcOnWorkspaceRemove(projectName));
+        break;
+      case "onePerProject":
+        // TODO implement https://github.com/eclipse/che/issues/6767
+        break;
+      default:
+        throw new IllegalArgumentException(
+            format("Unsupported PVC strategy '%s' configured", pvcStrategy));
     }
   }
 
-  /**
-   * Removes OpenShift project on {@code WorkspaceRemovedEvent}.
-   */
+  /** Removes OpenShift project on {@code WorkspaceRemovedEvent}. */
+  @VisibleForTesting
   class DeleteOpenShiftProjectOnWorkspaceRemove implements EventSubscriber<WorkspaceRemovedEvent> {
 
     @Override
@@ -79,11 +95,10 @@ public class OpenShiftProjectCleanerSelector {
     }
   }
 
-  /**
-   * Removes OpenShift Project PVC on {@code WorkspaceRemovedEvent}.
-   */
-  class DeleteOpenShiftProjectPvcOnWorkspaceRemove implements
-      EventSubscriber<WorkspaceRemovedEvent> {
+  /** Removes OpenShift Project PVC on {@code WorkspaceRemovedEvent}. */
+  @VisibleForTesting
+  class DeleteOpenShiftProjectPvcOnWorkspaceRemove
+      implements EventSubscriber<WorkspaceRemovedEvent> {
 
     private final String projectName;
 
@@ -100,10 +115,8 @@ public class OpenShiftProjectCleanerSelector {
     void doRemoveProject(String projectName, String workspaceId) {
       try (OpenShiftClient client = clientFactory.create()) {
         final String pvcUniqueName = pvcName + '-' + workspaceId;
-        final List<PersistentVolumeClaim> pvcs = client.persistentVolumeClaims()
-            .inNamespace(projectName)
-            .list()
-            .getItems();
+        final List<PersistentVolumeClaim> pvcs =
+            client.persistentVolumeClaims().inNamespace(projectName).list().getItems();
         for (PersistentVolumeClaim pvc : pvcs) {
           if (pvc.getMetadata().getName().equals(pvcUniqueName)) {
             client.persistentVolumeClaims().inNamespace(projectName).delete(pvc);

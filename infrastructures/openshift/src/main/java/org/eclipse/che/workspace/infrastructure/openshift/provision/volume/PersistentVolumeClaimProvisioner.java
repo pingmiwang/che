@@ -10,6 +10,8 @@
  */
 package org.eclipse.che.workspace.infrastructure.openshift.provision.volume;
 
+import static java.lang.String.format;
+
 import com.google.common.collect.ImmutableMap;
 import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.PersistentVolumeClaimBuilder;
@@ -40,7 +42,7 @@ import org.eclipse.che.workspace.infrastructure.openshift.provision.Configuratio
 public class PersistentVolumeClaimProvisioner implements ConfigurationProvisioner {
 
   private final boolean pvcEnable;
-  private final boolean perWorkspace;
+  private final String pvcStrategy;
   private final String pvcName;
   private final String pvcQuantity;
   private final String pvcAccessMode;
@@ -49,13 +51,13 @@ public class PersistentVolumeClaimProvisioner implements ConfigurationProvisione
   @Inject
   public PersistentVolumeClaimProvisioner(
       @Named("che.infra.openshift.pvc.enabled") boolean pvcEnable,
-      @Named("che.infra.openshift.pvc.one_per_workspace") boolean perWorkspace,
+      @Named("che.infra.openshift.pvc.strategy") String pvcStrategy,
       @Named("che.infra.openshift.pvc.name") String pvcName,
       @Named("che.infra.openshift.pvc.quantity") String pvcQuantity,
       @Named("che.infra.openshift.pvc.access_mode") String pvcAccessMode,
       @Named("che.workspace.projects.storage") String projectFolderPath) {
     this.pvcEnable = pvcEnable;
-    this.perWorkspace = perWorkspace;
+    this.pvcStrategy = pvcStrategy;
     this.pvcName = pvcName;
     this.pvcQuantity = pvcQuantity;
     this.pvcAccessMode = pvcAccessMode;
@@ -68,7 +70,19 @@ public class PersistentVolumeClaimProvisioner implements ConfigurationProvisione
       throws InfrastructureException {
     if (pvcEnable) {
       final String workspaceId = runtimeIdentity.getWorkspaceId();
-      final String pvcUniqueName = perWorkspace ? pvcName + '-' + workspaceId : pvcName;
+      final String pvcUniqueName;
+      switch (pvcStrategy) {
+        case "onePerWorkspace":
+          pvcUniqueName = pvcName + '-' + workspaceId;
+          break;
+        case "onePerProject":
+          pvcUniqueName = pvcName;
+          break;
+        default:
+          throw new IllegalArgumentException(
+              format("Unsupported PVC strategy '%s' configured", pvcStrategy));
+      }
+
       osEnv
           .getPersistentVolumeClaims()
           .put(
