@@ -17,6 +17,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.fabric8.openshift.client.OpenShiftClient;
 import org.eclipse.che.api.core.model.workspace.Workspace;
 import org.eclipse.che.api.core.notification.EventService;
 import org.eclipse.che.workspace.infrastructure.openshift.OpenShiftClientFactory;
@@ -28,7 +29,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 
-/** Tests {@link OpenShiftProjectCleanerSelector}. */
+/**
+ * Tests {@link OpenShiftProjectCleanerSelector}.
+ */
 @Listeners(MockitoTestNGListener.class)
 public class OpenShiftProjectCleanerSelectorTest {
 
@@ -38,11 +41,18 @@ public class OpenShiftProjectCleanerSelectorTest {
   private static final String ONE_PVC_PER_WORKSPACE_STRATEGY = "onePerWorkspace";
   private static final String ONE_PVC_PER_PROJECT_STRATEGY = "onePerProject";
 
-  @Mock private Workspace workspace;
-  @Mock private OpenShiftClientFactory clientFactory;
-  @Mock private EventService eventService;
-  @Mock private DeleteOpenShiftProjectOnWorkspaceRemove removeOSProjectOnWsRemoveSubscriber;
-  @Mock private DeleteOpenShiftProjectPvcOnWorkspaceRemove removeOSProjectPVCOnWsRemoveSubscriber;
+  @Mock
+  private Workspace workspace;
+  @Mock
+  private OpenShiftClientFactory clientFactory;
+  @Mock
+  private OpenShiftClient openShiftClient;
+  @Mock
+  private EventService eventService;
+  @Mock
+  private DeleteOpenShiftProjectOnWorkspaceRemove removeOSProjectOnWsRemoveSubscriber;
+  @Mock
+  private DeleteOpenShiftProjectPvcOnWorkspaceRemove removeOSProjectPVCOnWsRemoveSubscriber;
 
   private OpenShiftProjectCleanerSelector openShiftProjectCleanerSelector;
 
