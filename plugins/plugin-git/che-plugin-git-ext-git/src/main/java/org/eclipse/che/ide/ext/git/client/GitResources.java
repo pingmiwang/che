@@ -118,4 +118,19 @@ public interface GitResources extends ClientBundle {
 
   @Source("controls/revert.svg")
   SVGResource revert();
+
+  @Source("icons/added.svg")
+  SVGResource iconAdded();
+
+  @Source("icons/modified.svg")
+  SVGResource iconModified();
+
+  @Source("icons/deleted.svg")
+  SVGResource iconDeleted();
+
+  @Source("icons/renamed.svg")
+  SVGResource iconRenamed();
+
+  @Source("icons/copied.svg")
+  SVGResource iconCopied();
 }
